@@ -21,12 +21,12 @@ class User {
       [username, hashedPassword, first_name, last_name, phone]
     );
 
-    const _token = jwt.sign(
+    const token = jwt.sign(
       { username: user.rows[0].username },
       SECRET_KEY,
       JWT_OPTIONS
     );
-    return _token;
+    return token;
   }
 
   /** Authenticate: is this username/password valid? Returns boolean. */
@@ -39,6 +39,7 @@ class User {
       [username]
     );
     const user = result.rows[0];
+    if (!user) return false;
     if (await bcrypt.compare(password, user.password)) {
       return true;
     }
@@ -93,6 +94,11 @@ class User {
     return user.rows[0];
   }
 
+  /** Generate token for user */
+  static generateToken(username) {
+    return jwt.sign({ username }, SECRET_KEY, JWT_OPTIONS);
+  }
+
   /** Return messages from this user.
    *
    * [{id, to_user, body, sent_at, read_at}]
@@ -113,10 +119,23 @@ class User {
       m.read_at
       FROM messages AS m
       JOIN users as u ON m.to_username = u.username 
-      WHERE from_user = $1`,
+      WHERE from_username = $1`,
       [username]
     );
-    return result.rows[0];
+    return result.rows.map((msg) => {
+      return {
+        id: msg.id,
+        to_user: {
+          username: msg.to_username,
+          first_name: msg.first_name,
+          last_name: msg.last_name,
+          phone: msg.phone,
+        },
+        body: msg.body,
+        sent_at: msg.sent_at,
+        read_at: msg.read_at,
+      };
+    });
   }
 
   /** Return messages to this user.
@@ -139,10 +158,23 @@ class User {
       m.read_at
       FROM messages AS m
       JOIN users as u ON m.from_username = u.username 
-      WHERE from_user = $1`,
+      WHERE to_username = $1`,
       [username]
     );
-    return result.rows[0];
+    return result.rows.map((msg) => {
+      return {
+        id: msg.id,
+        from_user: {
+          username: msg.from_username,
+          first_name: msg.first_name,
+          last_name: msg.last_name,
+          phone: msg.phone,
+        },
+        body: msg.body,
+        sent_at: msg.sent_at,
+        read_at: msg.read_at,
+      };
+    });
   }
 }
 
